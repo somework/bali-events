@@ -87,6 +87,17 @@ export async function linkEventArtist(client, eventId, artistId) {
   );
 }
 
+export async function updateArtistPopularity(
+  client,
+  artistId,
+  { popularityScore, spotifyId, spotifyUrl, spotifyUnavailable }
+) {
+  await client.query(
+    "UPDATE artists SET popularity_score = $1, spotify_id = $2, spotify_url = $3, spotify_updated_at = NOW(), spotify_unavailable = $4 WHERE id = $5",
+    [popularityScore, spotifyId, spotifyUrl, spotifyUnavailable, artistId]
+  );
+}
+
 export async function withClient(callback) {
   const client = await pool.connect();
   try {
