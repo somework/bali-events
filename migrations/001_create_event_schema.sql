@@ -23,7 +23,7 @@ CREATE INDEX venues_normalized_name_idx ON venues (normalized_name);
 CREATE TABLE artists (
   id BIGSERIAL PRIMARY KEY,
   name TEXT NOT NULL,
-  normalized_name TEXT NOT NULL,
+  normalized_name TEXT NOT NULL UNIQUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -54,6 +54,8 @@ CREATE TABLE event_artists (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (event_id, artist_id)
 );
+
+CREATE INDEX event_artists_artist_id_idx ON event_artists (artist_id);
 
 INSERT INTO sources (name, weight) VALUES
   ('manual', 100),
