@@ -12,12 +12,13 @@ The top-level `docker-compose.yml` defines services for:
 
 ### Required environment variables
 
-Set these in your shell or an `.env` file in the repo root.
+Set these in your shell or an `.env` file in the repo root. A sample file is
+provided at `.env.example`.
 
 | Variable | Used by | Purpose | Default |
 | --- | --- | --- | --- |
 | `REDIS_URL` | collector, enricher, bot-api | Redis connection string | `redis://redis:6379/0` |
-| `DATABASE_URL` | collector, enricher, bot-api | Postgres connection string | `postgres://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-bali_events}` |
+| `DATABASE_URL` | collector, enricher, bot-api | Postgres connection string | `postgres://postgres:postgres@postgres:5432/bali_events` |
 | `BOT_API_PORT` | bot-api | Port exposed on the host | `8080` |
 | `POSTGRES_DB` | postgres | Database name (local profile only) | `bali_events` |
 | `POSTGRES_USER` | postgres | Database user (local profile only) | `postgres` |

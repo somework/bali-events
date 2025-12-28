@@ -1,8 +1,8 @@
 version: "3.9"
 
 x-app-env: &app-env
-  REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-  DATABASE_URL: ${DATABASE_URL:-postgres://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-bali_events}}
+  REDIS_URL: ${REDIS_URL}
+  DATABASE_URL: ${DATABASE_URL}
 
 services:
   redis:
@@ -17,13 +17,18 @@ services:
     profiles:
       - local
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-bali_events}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   collector:
     build:
@@ -32,6 +37,8 @@ services:
       <<: *app-env
     depends_on:
       - redis
+      postgres:
+        condition: service_healthy
 
   enricher:
     build:
@@ -40,6 +47,8 @@ services:
       <<: *app-env
     depends_on:
       - redis
+      postgres:
+        condition: service_healthy
 
   bot-api:
     build:
@@ -51,6 +60,8 @@ services:
       - "${BOT_API_PORT:-8080}:8080"
     depends_on:
       - redis
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres-data:
