@@ -14,7 +14,14 @@ export async function enqueueArtistEnrichment(artistId, name) {
   await artistQueue.add(
     "enrich-artist",
     { artistId, name },
-    { jobId: `artist:${artistId}` }
+    {
+      jobId: `artist:${artistId}`,
+      attempts: 4,
+      backoff: {
+        type: "exponential",
+        delay: 1000,
+      },
+    }
   );
 }
 
