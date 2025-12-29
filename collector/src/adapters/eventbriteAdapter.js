@@ -1,6 +1,7 @@
 import { load } from "cheerio";
 import { fetchPageContent } from "../utils/playwright.js";
 import { normalizeName, toIsoString } from "../utils/normalize.js";
+import { enrichEventVenue } from "../utils/venues.js";
 
 const LISTING_URL = "https://www.eventbrite.com/d/indonesia--bali/music--events/";
 
@@ -43,7 +44,7 @@ export class EventbriteAdapter {
           return null;
         }
 
-        return {
+        return enrichEventVenue({
           source: this.sourceName,
           sourceEventId: event.sourceEventId,
           name: event.title,
@@ -53,11 +54,12 @@ export class EventbriteAdapter {
           endTime: null,
           venueName: event.location || null,
           venueAddress: null,
+          venueArea: null,
           venueLatitude: null,
           venueLongitude: null,
           url: event.url,
           artists: [],
-        };
+        });
       })
       .filter(Boolean);
   }

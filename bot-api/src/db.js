@@ -21,8 +21,11 @@ export async function fetchRankedEvents({ startTime, endTime, area, limit = 10 }
     let areaClause = "";
 
     if (area) {
+      params.push(area);
+      const exactParam = params.length;
       params.push(`%${area}%`);
-      areaClause = `AND (v.name ILIKE $${params.length} OR v.address ILIKE $${params.length})`;
+      const likeParam = params.length;
+      areaClause = `AND (v.area = $${exactParam} OR v.name ILIKE $${likeParam} OR v.address ILIKE $${likeParam})`;
     }
 
     params.push(limit);

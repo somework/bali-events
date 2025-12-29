@@ -9,6 +9,7 @@
  * @property {string | null} endTime
  * @property {string | null} venueName
  * @property {string | null} venueAddress
+ * @property {string | null} venueArea
  * @property {number | null} venueLatitude
  * @property {number | null} venueLongitude
  * @property {string | null} url
