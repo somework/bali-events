@@ -18,8 +18,23 @@ import {
 
 const app = express();
 const port = Number.parseInt(process.env.BOT_API_PORT ?? "8080", 10);
-const alertLookaheadDays = Number.parseInt(process.env.ALERT_LOOKAHEAD_DAYS ?? "7", 10);
-const alertPollIntervalMs = Number.parseInt(process.env.ALERT_POLL_INTERVAL_MS ?? "300000", 10);
+function parseIntegerEnv(name, fallback) {
+  const rawValue = process.env[name];
+  if (rawValue === undefined || rawValue === null || rawValue === "") {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(rawValue, 10);
+  if (Number.isNaN(parsed)) {
+    console.warn(`Invalid ${name} value '${rawValue}'. Falling back to ${fallback}.`);
+    return fallback;
+  }
+
+  return parsed;
+}
+
+const alertLookaheadDays = parseIntegerEnv("ALERT_LOOKAHEAD_DAYS", 7);
+const alertPollIntervalMs = parseIntegerEnv("ALERT_POLL_INTERVAL_MS", 300000);
 
 app.use(express.json());
 
