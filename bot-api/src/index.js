@@ -69,8 +69,28 @@ app.get("/week", async (req, res) => {
   }
 });
 
+function requireCommandAuth(req, res) {
+  const expectedKey = process.env.TELEGRAM_COMMAND_API_KEY;
+  if (!expectedKey) {
+    res.status(500).json({ error: "TELEGRAM_COMMAND_API_KEY must be set." });
+    return false;
+  }
+
+  const providedKey = req.headers["x-api-key"];
+  if (!providedKey || providedKey !== expectedKey) {
+    res.status(401).json({ error: "Unauthorized." });
+    return false;
+  }
+
+  return true;
+}
+
 app.post("/telegram/command", async (req, res) => {
   try {
+    if (!requireCommandAuth(req, res)) {
+      return;
+    }
+
     const { command, chatId } = req.body ?? {};
     if (!command || !chatId) {
       res.status(400).json({ error: "Provide command and chatId." });
