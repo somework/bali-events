@@ -12,6 +12,7 @@ const RANGE_DEFINITIONS = {
 };
 
 const DISPLAY_TIME_ZONE = "Asia/Makassar";
+const SUBSCRIPTION_TYPES = new Set(["artist", "venue"]);
 
 export function resolveArea(input) {
   if (!input) {
@@ -36,6 +37,25 @@ export function parseTelegramCommand(text) {
   const rangeKey = command === "/today" ? "today" : command === "/week" ? "week" : null;
 
   if (!rangeKey) {
+    if (command === "/subscribe" || command === "/unsubscribe") {
+      const preferenceType = parts[1]?.toLowerCase() ?? "";
+      if (!SUBSCRIPTION_TYPES.has(preferenceType)) {
+        return null;
+      }
+
+      const preferenceValue = parts.slice(2).join(" ").trim();
+      if (!preferenceValue) {
+        return null;
+      }
+
+      return {
+        kind: "subscription",
+        action: command === "/subscribe" ? "subscribe" : "unsubscribe",
+        preferenceType,
+        preferenceValue,
+      };
+    }
+
     return null;
   }
 
@@ -43,6 +63,7 @@ export function parseTelegramCommand(text) {
   const { area, raw } = resolveArea(areaInput);
 
   return {
+    kind: "range",
     rangeKey,
     area,
     areaInput: raw,
@@ -107,6 +128,48 @@ export async function buildTelegramMessage({ rangeKey, area, limit = 10 }) {
   return lines.join("\n").trim();
 }
 
+export function buildAlertMessage({ events }) {
+  if (!events.length) {
+    return "No new events matched your subscriptions.";
+  }
+
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: DISPLAY_TIME_ZONE,
+  });
+
+  const lines = ["New events matching your subscriptions:"];
+
+  for (const event of events) {
+    const dateLabel = formatter.format(new Date(event.start_time));
+    const venueLabel = event.venue_name || "Venue TBA";
+    const artistLabel = event.top_artist_name || "Artist TBA";
+    const ticketLabel = event.url ? `Tickets: ${event.url}` : "Tickets: TBA";
+    const matchLabels = [];
+
+    if (event.matched_artists) {
+      matchLabels.push(`Artists: ${event.matched_artists}`);
+    }
+    if (event.matched_venues) {
+      matchLabels.push(`Venues: ${event.matched_venues}`);
+    }
+
+    lines.push(`${dateLabel} — ${venueLabel}`);
+    lines.push(`Top artist: ${artistLabel}`);
+    if (matchLabels.length) {
+      lines.push(`Matches: ${matchLabels.join(" | ")}`);
+    }
+    lines.push(ticketLabel);
+    lines.push("");
+  }
+
+  return lines.join("\n").trim();
+}
+
 export async function publishTelegramMessage({ token, chatId, text }) {
   if (!token || !chatId) {
     throw new Error("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are required to publish messages.");
@@ -133,4 +196,8 @@ export async function publishTelegramMessage({ token, chatId, text }) {
 
 export function listSupportedAreas() {
   return Object.values(AREA_ALIASES);
+}
+
+export function listSubscriptionTypes() {
+  return Array.from(SUBSCRIPTION_TYPES);
 }
