@@ -3,14 +3,17 @@ import { EventbriteAdapter } from "./adapters/eventbriteAdapter.js";
 import { TheBeatBaliAdapter } from "./adapters/theBeatBaliAdapter.js";
 import {
   closePool,
-  getSourceId,
+  findEventCandidates,
+  getSourceInfo,
   linkEventArtist,
   upsertArtist,
   upsertEvent,
   upsertVenue,
+  updateEvent,
   withClient,
 } from "./db.js";
 import { closeQueue, enqueueArtistEnrichment } from "./queue.js";
+import { selectBestMatch } from "./utils/matching.js";
 
 const adapters = [
   new ResidentAdvisorAdapter(),
@@ -20,13 +23,29 @@ const adapters = [
 
 async function persistEvents(adapter, events) {
   await withClient(async (client) => {
-    const sourceId = await getSourceId(client, adapter.sourceName);
+    const { id: sourceId, weight: sourceWeight } = await getSourceInfo(
+      client,
+      adapter.sourceName
+    );
 
     for (const event of events) {
       await client.query("BEGIN");
       try {
         const venueId = await upsertVenue(client, event);
-        const eventId = await upsertEvent(client, sourceId, event, venueId);
+        const candidates = await findEventCandidates(client, {
+          startTime: event.startTime,
+        });
+        const match = selectBestMatch(event, candidates, sourceWeight);
+        let eventId;
+
+        if (match) {
+          eventId = match.candidate.id;
+          if (match.shouldUpdate) {
+            await updateEvent(client, eventId, sourceId, event, venueId);
+          }
+        } else {
+          eventId = await upsertEvent(client, sourceId, event, venueId);
+        }
 
         for (const artistName of event.artists) {
           const artistId = await upsertArtist(client, artistName);

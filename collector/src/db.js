@@ -7,17 +7,17 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-export async function getSourceId(client, name) {
-  const existing = await client.query("SELECT id FROM sources WHERE name = $1", [name]);
+export async function getSourceInfo(client, name) {
+  const existing = await client.query("SELECT id, weight FROM sources WHERE name = $1", [name]);
   if (existing.rows.length > 0) {
-    return existing.rows[0].id;
+    return existing.rows[0];
   }
 
   const inserted = await client.query(
-    "INSERT INTO sources (name, weight) VALUES ($1, 50) RETURNING id",
+    "INSERT INTO sources (name, weight) VALUES ($1, 50) RETURNING id, weight",
     [name]
   );
-  return inserted.rows[0].id;
+  return inserted.rows[0];
 }
 
 export async function upsertVenue(client, event) {
@@ -78,6 +78,75 @@ export async function upsertEvent(client, sourceId, event, venueId) {
   );
 
   return result.rows[0].id;
+}
+
+export async function updateEvent(client, eventId, sourceId, event, venueId) {
+  await client.query(
+    "UPDATE events SET source_id = $1, source_event_id = $2, name = $3, normalized_name = $4, description = $5, start_time = $6, end_time = $7, venue_id = $8, url = $9 WHERE id = $10",
+    [
+      sourceId,
+      event.sourceEventId,
+      event.name,
+      event.normalizedName,
+      event.description,
+      event.startTime,
+      event.endTime,
+      venueId,
+      event.url,
+      eventId,
+    ]
+  );
+}
+
+export async function findEventCandidates(client, { startTime }) {
+  if (!startTime) {
+    return [];
+  }
+
+  const start = new Date(startTime);
+  if (Number.isNaN(start.getTime())) {
+    return [];
+  }
+
+  const windowStart = new Date(start.getTime() - 6 * 60 * 60 * 1000);
+  const windowEnd = new Date(start.getTime() + 6 * 60 * 60 * 1000);
+
+  const result = await client.query(
+    `SELECT
+      events.id,
+      events.name,
+      events.normalized_name,
+      events.description,
+      events.start_time,
+      events.end_time,
+      events.venue_id,
+      events.url,
+      events.source_id,
+      sources.weight AS source_weight,
+      venues.name AS venue_name,
+      venues.normalized_name AS venue_normalized_name,
+      venues.address AS venue_address,
+      venues.latitude AS venue_latitude,
+      venues.longitude AS venue_longitude,
+      ARRAY_REMOVE(ARRAY_AGG(artists.normalized_name), NULL) AS artist_names
+    FROM events
+    LEFT JOIN sources ON events.source_id = sources.id
+    LEFT JOIN venues ON events.venue_id = venues.id
+    LEFT JOIN event_artists ON events.id = event_artists.event_id
+    LEFT JOIN artists ON event_artists.artist_id = artists.id
+    WHERE events.start_time BETWEEN $1 AND $2
+    GROUP BY
+      events.id,
+      sources.weight,
+      venues.name,
+      venues.normalized_name,
+      venues.address,
+      venues.latitude,
+      venues.longitude`,
+    [windowStart.toISOString(), windowEnd.toISOString()]
+  );
+
+  return result.rows;
 }
 
 export async function linkEventArtist(client, eventId, artistId) {
