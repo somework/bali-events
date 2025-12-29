@@ -12,6 +12,13 @@ class SpotifyUnavailableError extends Error {
   }
 }
 
+class SoundCloudUnavailableError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "SoundCloudUnavailableError";
+  }
+}
+
 let spotifyToken = null;
 let spotifyTokenExpiresAt = 0;
 
@@ -111,16 +118,89 @@ async function fetchSpotifyArtist(name) {
   return payload.artists?.items?.[0] ?? null;
 }
 
-function computePopularityScore(artist) {
+function normalizeSpotifyPopularity(artist) {
   if (!artist || typeof artist.popularity !== "number") {
-    return 0;
+    return null;
   }
   return Math.max(0, Math.min(100, Math.round(artist.popularity)));
 }
 
+function normalizeSoundCloudFollowers(followerCount) {
+  if (typeof followerCount !== "number") {
+    return null;
+  }
+  const clamped = Math.max(0, followerCount);
+  const maxFollowers = 1_000_000;
+  const scaled =
+    (Math.log10(clamped + 1) / Math.log10(maxFollowers + 1)) * 100;
+  return Math.max(0, Math.min(100, Math.round(scaled)));
+}
+
+function computePopularityScore({ spotifyScore, soundCloudScore }) {
+  const weights = [
+    { score: spotifyScore, cap: 70 },
+    { score: soundCloudScore, cap: 30 },
+  ];
+  const weightedTotal = weights.reduce((total, { score, cap }) => {
+    if (typeof score !== "number") {
+      return total;
+    }
+    const contribution = Math.min(cap, (score / 100) * cap);
+    return total + contribution;
+  }, 0);
+  return Math.max(0, Math.min(100, Math.round(weightedTotal)));
+}
+
+async function fetchSoundCloudUser(name) {
+  const clientId = process.env.SOUNDCLOUD_CLIENT_ID;
+  if (!clientId) {
+    return null;
+  }
+
+  const query = new URLSearchParams({
+    q: name,
+    limit: "1",
+    client_id: clientId,
+  });
+
+  const response = await fetch(
+    `https://api-v2.soundcloud.com/search/users?${query.toString()}`
+  );
+
+  if (!response.ok) {
+    if ([429, 500, 502, 503].includes(response.status)) {
+      throw new SoundCloudUnavailableError(
+        `SoundCloud search unavailable: ${response.status}`
+      );
+    }
+    throw new Error(`SoundCloud search failed: ${response.status}`);
+  }
+
+  const payload = await response.json();
+  return payload.collection?.[0] ?? null;
+}
+
 async function enrichArtist({ artistId, name }) {
   const spotifyArtist = await fetchSpotifyArtist(name);
-  const popularityScore = computePopularityScore(spotifyArtist);
+  let soundCloudUser = null;
+  try {
+    soundCloudUser = await fetchSoundCloudUser(name);
+  } catch (error) {
+    if (error instanceof SoundCloudUnavailableError) {
+      console.warn(`SoundCloud enrichment unavailable for ${name}`, error);
+    } else {
+      console.warn(`SoundCloud enrichment failed for ${name}`, error);
+    }
+  }
+
+  const spotifyScore = normalizeSpotifyPopularity(spotifyArtist);
+  const soundCloudScore = normalizeSoundCloudFollowers(
+    soundCloudUser?.followers_count
+  );
+  const popularityScore = computePopularityScore({
+    spotifyScore,
+    soundCloudScore,
+  });
 
   await withClient(async (client) => {
     await updateArtistPopularity(client, artistId, {
