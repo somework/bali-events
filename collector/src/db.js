@@ -27,18 +27,37 @@ export async function upsertVenue(client, event) {
 
   const normalized = normalizeName(event.venueName);
   const existing = await client.query(
-    "SELECT id FROM venues WHERE normalized_name = $1 ORDER BY id LIMIT 1",
+    "SELECT id, area, address, latitude, longitude FROM venues WHERE normalized_name = $1 ORDER BY id LIMIT 1",
     [normalized]
   );
   if (existing.rows.length > 0) {
-    return existing.rows[0].id;
+    const [venue] = existing.rows;
+    const nextArea = venue.area ?? event.venueArea ?? null;
+    const nextAddress = venue.address ?? event.venueAddress ?? null;
+    const nextLatitude = venue.latitude ?? event.venueLatitude ?? null;
+    const nextLongitude = venue.longitude ?? event.venueLongitude ?? null;
+
+    if (
+      nextArea !== venue.area ||
+      nextAddress !== venue.address ||
+      nextLatitude !== venue.latitude ||
+      nextLongitude !== venue.longitude
+    ) {
+      await client.query(
+        "UPDATE venues SET area = $2, address = $3, latitude = $4, longitude = $5 WHERE id = $1",
+        [venue.id, nextArea, nextAddress, nextLatitude, nextLongitude]
+      );
+    }
+
+    return venue.id;
   }
 
   const inserted = await client.query(
-    "INSERT INTO venues (name, normalized_name, address, latitude, longitude) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+    "INSERT INTO venues (name, normalized_name, area, address, latitude, longitude) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
     [
       event.venueName,
       normalized,
+      event.venueArea,
       event.venueAddress,
       event.venueLatitude,
       event.venueLongitude,

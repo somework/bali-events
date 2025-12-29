@@ -1,6 +1,7 @@
 import { load } from "cheerio";
 import { fetchPageContent } from "../utils/playwright.js";
 import { normalizeName, toIsoString } from "../utils/normalize.js";
+import { enrichEventVenue } from "../utils/venues.js";
 
 const LISTING_URL = "https://ra.co/events/id/bali";
 
@@ -43,7 +44,7 @@ export class ResidentAdvisorAdapter {
           return null;
         }
 
-        return {
+        return enrichEventVenue({
           source: this.sourceName,
           sourceEventId: event.sourceEventId,
           name: event.name,
@@ -53,11 +54,12 @@ export class ResidentAdvisorAdapter {
           endTime: null,
           venueName: event.venue || null,
           venueAddress: null,
+          venueArea: null,
           venueLatitude: null,
           venueLongitude: null,
           url: event.url,
           artists: [],
-        };
+        });
       })
       .filter(Boolean);
   }

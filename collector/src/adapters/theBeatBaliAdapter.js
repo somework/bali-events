@@ -1,5 +1,6 @@
 import { load } from "cheerio";
 import { normalizeName, toIsoString } from "../utils/normalize.js";
+import { enrichEventVenue } from "../utils/venues.js";
 
 const LISTING_URL = "https://thebeatbali.com/events";
 
@@ -47,7 +48,7 @@ export class TheBeatBaliAdapter {
           return null;
         }
 
-        return {
+        return enrichEventVenue({
           source: this.sourceName,
           sourceEventId: event.sourceEventId,
           name: event.title,
@@ -57,11 +58,12 @@ export class TheBeatBaliAdapter {
           endTime: null,
           venueName: event.venue || null,
           venueAddress: null,
+          venueArea: null,
           venueLatitude: null,
           venueLongitude: null,
           url: event.url,
           artists: [],
-        };
+        });
       })
       .filter(Boolean);
   }
