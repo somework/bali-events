@@ -188,6 +188,25 @@ export async function recordAlerts({ chatId, eventIds }) {
   });
 }
 
+export async function deleteAlerts({ chatId, eventIds }) {
+  if (!eventIds.length) {
+    return;
+  }
+
+  return withClient(async (client) => {
+    const params = [chatId, ...eventIds];
+    const placeholders = eventIds.map((_, index) => `$${index + 2}`).join(", ");
+    await client.query(
+      `
+        DELETE FROM user_alerts
+        WHERE chat_id = $1
+          AND event_id IN (${placeholders});
+      `,
+      params
+    );
+  });
+}
+
 export async function closePool() {
   await pool.end();
 }

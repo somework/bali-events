@@ -10,6 +10,7 @@ import {
 import {
   addSubscription,
   closePool,
+  deleteAlerts,
   fetchAlertCandidates,
   recordAlerts,
   removeSubscription,
@@ -230,12 +231,13 @@ async function sendScheduledAlerts() {
   }, {});
 
   for (const [chatId, events] of Object.entries(grouped)) {
+    const eventIds = events.map((event) => event.event_id);
     try {
+      await recordAlerts({ chatId, eventIds });
       const text = buildAlertMessage({ events });
       await publishTelegramMessage({ token: process.env.TELEGRAM_BOT_TOKEN, chatId, text });
-      const eventIds = events.map((event) => event.event_id);
-      await recordAlerts({ chatId, eventIds });
     } catch (error) {
+      await deleteAlerts({ chatId, eventIds });
       console.error(`Failed to send alerts to ${chatId}:`, error);
     }
   }
